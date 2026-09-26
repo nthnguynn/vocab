@@ -1,0 +1,52 @@
+generator client {
+  provider = "prisma-client"
+  output   = "../src/generated/prisma"
+}
+
+datasource db {
+  provider = "sqlite"
+}
+
+model Topic {
+  id        Int      @id @default(autoincrement())
+  name      String   @unique
+  emoji     String   @default("🌸")
+  createdAt DateTime @default(now())
+  words     Word[]
+}
+
+model Word {
+  id           Int       @id @default(autoincrement())
+  word         String
+  type         String?   // Loại từ: Noun, Verb...
+  meaning      String    // Nghĩa tiếng Việt
+  definition   String?   // Định nghĩa chi tiết
+  example      String?
+  note         String?
+  topicId      Int
+  topic        Topic     @relation(fields: [topicId], references: [id], onDelete: Cascade)
+  createdAt    DateTime  @default(now())
+  // Lặp lại ngắt quãng (1 - 2 - 4 - 7 ngày...)
+  stage        Int       @default(0)
+  nextReviewAt DateTime  @default(now())
+  lastReviewAt DateTime?
+  correctCount Int       @default(0)
+  wrongCount   Int       @default(0)
+  attempts     QuizAttempt[]
+
+  @@index([topicId])
+  @@index([nextReviewAt])
+}
+
+// Mỗi lần ôn (flashcard) hoặc làm test đều được ghi lại để tính streak & mục tiêu ngày
+model QuizAttempt {
+  id        Int      @id @default(autoincrement())
+  wordId    Int
+  word      Word     @relation(fields: [wordId], references: [id], onDelete: Cascade)
+  mode      String   // "review" | "test"
+  correct   Boolean
+  answer    String?
+  createdAt DateTime @default(now())
+
+  @@index([createdAt])
+}
