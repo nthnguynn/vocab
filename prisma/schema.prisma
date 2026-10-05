@@ -13,6 +13,7 @@ model Topic {
   emoji     String   @default("🌸")
   createdAt DateTime @default(now())
   words     Word[]
+  passages  Passage[]
 }
 
 model Word {
@@ -50,3 +51,39 @@ model QuizAttempt {
 
   @@index([createdAt])
 }
+
+model Passage {
+  id              Int              @id @default(autoincrement())
+  title           String
+  content         String           // Đoạn văn tiếng Anh đầy đủ
+  translation     String?          // Bản dịch tiếng Việt
+  topicId         Int?
+  topic           Topic?           @relation(fields: [topicId], references: [id], onDelete: SetNull)
+  level           String           @default("Intermediate") // Beginner | Intermediate | Advanced
+  tags            String?          // "IELTS, Speech, Daily, v.v."
+  timesPracticed  Int              @default(0)
+  lastPracticedAt DateTime?
+  bestScore       Int?             // Điểm cao nhất 0-100
+  createdAt       DateTime         @default(now())
+  updatedAt       DateTime         @updatedAt
+  sessions        PassageSession[]
+
+  @@index([topicId])
+  @@index([createdAt])
+}
+
+model PassageSession {
+  id          Int      @id @default(autoincrement())
+  passageId   Int
+  passage     Passage  @relation(fields: [passageId], references: [id], onDelete: Cascade)
+  mode        String   // "listen" | "vanish" | "typing" | "scramble" | "recite"
+  score       Int      // 0 - 100
+  accuracy    Float?
+  wpm         Int?
+  timeSeconds Int?
+  createdAt   DateTime @default(now())
+
+  @@index([passageId])
+  @@index([createdAt])
+}
+

@@ -119,6 +119,121 @@ export async function recordTestAnswer(wordId: number, answer: string, correct: 
   ]);
 }
 
+/* ---------------- Luyện đoạn văn (Passage Memorization) ---------------- */
+
+async function passageData(fd: FormData) {
+  const title = str(fd, "title");
+  const content = str(fd, "content");
+  if (!title || !content) return { error: "Tiêu đề và nội dung đoạn văn là bắt buộc" } as const;
+
+  const translation = str(fd, "translation");
+  const level = str(fd, "level") || "Intermediate";
+  const tags = str(fd, "tags");
+
+  let topicId = Number(fd.get("topicId")) || null;
+  const newTopic = str(fd, "newTopic");
+  if (newTopic) {
+    const t = await prisma.topic.upsert({ where: { name: newTopic }, update: {}, create: { name: newTopic } });
+    topicId = t.id;
+  }
+
+  return {
+    data: {
+      title,
+      content,
+      translation,
+      level,
+      tags,
+      topicId,
+    },
+  } as const;
+}
+
+export async function createPassage(_: FormState, fd: FormData): Promise<FormState> {
+  const res = await passageData(fd);
+  if ("error" in res) return { error: res.error };
+  const passage = await prisma.passage.create({ data: res.data });
+  refresh();
+  redirect(`/passages/${passage.id}`);
+}
+
+export async function updatePassage(id: number, _: FormState, fd: FormData): Promise<FormState> {
+  const res = await passageData(fd);
+  if ("error" in res) return { error: res.error };
+  await prisma.passage.update({ where: { id }, data: res.data });
+  refresh();
+  redirect(`/passages/${id}`);
+}
+
+export async function deletePassage(id: number) {
+  await prisma.passage.delete({ where: { id } });
+  refresh();
+  redirect("/passages");
+}
+
+export async function recordPassageSession({
+  passageId,
+  mode,
+  score,
+  accuracy,
+  wpm,
+  timeSeconds,
+}: {
+  passageId: number;
+  mode: string;
+  score: number;
+  accuracy?: number;
+  wpm?: number;
+  timeSeconds?: number;
+}) {
+  const passage = await prisma.passage.findUnique({ where: { id: passageId } });
+  if (!passage) return;
+
+  const newBestScore = Math.max(passage.bestScore ?? 0, score);
+  await prisma.$transaction([
+    prisma.passage.update({
+      where: { id: passageId },
+      data: {
+        timesPracticed: { increment: 1 },
+        lastPracticedAt: new Date(),
+        bestScore: newBestScore,
+      },
+    }),
+    prisma.passageSession.create({
+      data: {
+        passageId,
+        mode,
+        score,
+        accuracy: accuracy ?? null,
+        wpm: wpm ?? null,
+        timeSeconds: timeSeconds ?? null,
+      },
+    }),
+  ]);
+}
+
+export async function ensureStarterPassages() {
+  const count = await prisma.passage.count();
+  if (count > 0) return;
+  const { STARTER_PASSAGES } = await import("@/lib/passageSeeds");
+  const topics = await prisma.topic.findMany();
+  const topicMap = new Map(topics.map((t) => [t.name, t.id]));
+  for (const p of STARTER_PASSAGES) {
+    const topicId = p.topicName ? topicMap.get(p.topicName) : undefined;
+    await prisma.passage.create({
+      data: {
+        title: p.title,
+        content: p.content,
+        translation: p.translation,
+        level: p.level,
+        tags: p.tags,
+        topicId: topicId ?? null,
+      },
+    });
+  }
+}
+
+
 /* ---------------- Nhập từ Google Sheets / file CSV ---------------- */
 
 async function importCsv(csv: string): Promise<FormState> {

@@ -2,12 +2,20 @@ import Link from "next/link";
 import { connection } from "next/server";
 import { getDashboard, DAILY_NEW_WORD_GOAL } from "@/lib/stats";
 import { addDays, dayKey, formatDate } from "@/lib/dates";
+import { prisma } from "@/lib/prisma";
 
 const WEEKDAYS = ["T2", "T3", "T4", "T5", "T6", "T7", "CN"];
 
 export default async function Home() {
   await connection();
-  const d = await getDashboard();
+  const [d, recentPassages] = await Promise.all([
+    getDashboard(),
+    prisma.passage.findMany({
+      take: 3,
+      orderBy: { createdAt: "desc" },
+      include: { topic: { select: { name: true, emoji: true } } },
+    }),
+  ]);
   const { goals } = d;
   const goalsDone = [goals.newWords.done, goals.review.done, goals.test.done].filter(Boolean).length;
 
@@ -25,6 +33,7 @@ export default async function Home() {
           </div>
           <div className="flex flex-wrap gap-2">
             <Link href="/words" className="btn">＋ Thêm từ mới</Link>
+            <Link href="/passages" className="btn-soft">📜 Luyện đoạn văn</Link>
             <Link href="/review?mode=due" className="btn-soft">🔁 Ôn tập ({goals.review.due})</Link>
           </div>
         </div>
@@ -146,6 +155,59 @@ export default async function Home() {
             );
           })}
         </div>
+      </section>
+
+      {/* Passages Section */}
+      <section className="space-y-3">
+        <div className="flex items-center justify-between">
+          <div>
+            <h2 className="h-display text-xl">Luyện học thuộc đoạn văn 📜</h2>
+            <p className="text-xs text-muted">Luyện phản xạ, shadow phát âm và học thuộc từng câu theo phương pháp khoa học.</p>
+          </div>
+          <Link href="/passages" className="btn-ghost">Khám phá tất cả →</Link>
+        </div>
+
+        {recentPassages.length === 0 ? (
+          <div className="card flex items-center justify-between p-6">
+            <div>
+              <p className="font-semibold text-ink">Bắt đầu học thuộc đoạn văn đầu tiên!</p>
+              <p className="text-xs text-muted">Khám phá kho bài mẫu IELTS, phát biểu truyền cảm hứng hoặc tự tạo bài của riêng bạn.</p>
+            </div>
+            <Link href="/passages" className="btn !px-4 !py-2 text-xs">
+              Vào Studio 🚀
+            </Link>
+          </div>
+        ) : (
+          <div className="grid gap-4 sm:grid-cols-3">
+            {recentPassages.map((p) => {
+              const words = p.content.trim().split(/\s+/).filter(Boolean).length;
+              return (
+                <Link
+                  key={p.id}
+                  href={`/passages/${p.id}`}
+                  className="card group flex flex-col justify-between transition hover:-translate-y-1 hover:shadow-pop"
+                >
+                  <div className="space-y-2">
+                    <div className="flex items-center justify-between gap-2">
+                      <span className="chip text-[11px]">{p.level === "Beginner" ? "Cơ bản" : p.level === "Advanced" ? "Nâng cao" : "Trung cấp"}</span>
+                      {p.topic && <span className="text-xs text-muted">{p.topic.emoji} {p.topic.name}</span>}
+                    </div>
+                    <h3 className="h-display font-bold text-ink group-hover:text-petal-600 transition truncate">
+                      {p.title}
+                    </h3>
+                    <p className="line-clamp-2 text-xs text-muted leading-relaxed font-sans">
+                      {p.content}
+                    </p>
+                  </div>
+                  <div className="mt-4 flex items-center justify-between border-t border-petal-100 pt-2 text-xs text-muted">
+                    <span>{words} từ</span>
+                    <span className="font-semibold text-petal-600 group-hover:underline">Luyện ngay →</span>
+                  </div>
+                </Link>
+              );
+            })}
+          </div>
+        )}
       </section>
     </div>
   );
