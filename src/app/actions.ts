@@ -168,7 +168,46 @@ export async function updatePassage(id: number, _: FormState, fd: FormData): Pro
 export async function deletePassage(id: number) {
   await prisma.passage.delete({ where: { id } });
   refresh();
+}
+
+export async function deletePassageAndRedirect(id: number) {
+  await prisma.passage.delete({ where: { id } });
+  refresh();
   redirect("/passages");
+}
+
+export async function resetPassageHistory(id: number) {
+  await prisma.$transaction([
+    prisma.passageSession.deleteMany({ where: { passageId: id } }),
+    prisma.passage.update({
+      where: { id },
+      data: { timesPracticed: 0, lastPracticedAt: null, bestScore: null },
+    }),
+  ]);
+  refresh();
+}
+
+export async function restoreDefaultPassages() {
+  const topics = await prisma.topic.findMany();
+  const topicMap = new Map(topics.map((t) => [t.name, t.id]));
+  const { STARTER_PASSAGES } = await import("@/lib/passageSeeds");
+  for (const p of STARTER_PASSAGES) {
+    const existing = await prisma.passage.findFirst({ where: { title: p.title } });
+    if (!existing) {
+      const topicId = p.topicName ? topicMap.get(p.topicName) : undefined;
+      await prisma.passage.create({
+        data: {
+          title: p.title,
+          content: p.content,
+          translation: p.translation,
+          level: p.level,
+          tags: p.tags,
+          topicId: topicId ?? null,
+        },
+      });
+    }
+  }
+  refresh();
 }
 
 export async function recordPassageSession({

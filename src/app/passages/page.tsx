@@ -1,8 +1,9 @@
 import { connection } from "next/server";
 import Link from "next/link";
 import { prisma } from "@/lib/prisma";
-import { ensureStarterPassages } from "@/app/actions";
+import { deletePassage, restoreDefaultPassages } from "@/app/actions";
 import SpeakButton from "@/components/SpeakButton";
+import DeleteButton from "@/components/DeleteButton";
 import type { Prisma } from "@/generated/prisma/client";
 
 interface SearchParams {
@@ -14,7 +15,6 @@ interface SearchParams {
 
 export default async function PassagesPage(props: { searchParams: Promise<SearchParams> }) {
   await connection();
-  await ensureStarterPassages();
 
   const sp = await props.searchParams;
   const q = sp.q?.trim();
@@ -194,11 +194,18 @@ export default async function PassagesPage(props: { searchParams: Promise<Search
           <div className="card !p-12 text-center">
             <span className="text-4xl">🌷</span>
             <h3 className="h-display mt-3 text-xl">Không tìm thấy đoạn văn nào</h3>
-            <p className="mt-1 text-sm text-muted">Hãy thử thay đổi điều kiện tìm kiếm hoặc tạo thêm đoạn văn mới.</p>
-            <div className="mt-4">
+            <p className="mt-1 text-sm text-muted">
+              Bạn có thể tạo đoạn văn mới hoặc nạp lại bộ 6 bài mẫu chất lượng cao.
+            </p>
+            <div className="mt-5 flex flex-wrap items-center justify-center gap-3">
               <Link href="/passages/new" className="btn">
-                ＋ Thêm đoạn văn đầu tiên
+                ＋ Thêm đoạn văn mới
               </Link>
+              <form action={restoreDefaultPassages}>
+                <button type="submit" className="btn-soft cursor-pointer">
+                  📥 Nạp lại 6 bài mẫu mặc định
+                </button>
+              </form>
             </div>
           </div>
         ) : (
@@ -278,13 +285,19 @@ export default async function PassagesPage(props: { searchParams: Promise<Search
                       )}
                     </div>
 
-                    <div className="flex items-center gap-2">
+                    <div className="flex items-center gap-1.5">
                       <Link
                         href={`/passages/${p.id}/edit`}
                         className="rounded-full px-2.5 py-1 text-xs font-medium text-muted hover:bg-petal-100 hover:text-petal-700 transition"
                       >
                         Sửa
                       </Link>
+                      <DeleteButton
+                        onDelete={deletePassage.bind(null, p.id)}
+                        confirmText={`Bạn có chắc muốn xoá đoạn văn “${p.title}”?`}
+                        label="🗑️"
+                        className="rounded-full px-2 py-1 text-xs text-muted hover:bg-petal-100 hover:!text-berry transition"
+                      />
                       <Link href={`/passages/${p.id}`} className="btn !px-4 !py-1.5 text-xs">
                         Luyện ngay 🚀
                       </Link>

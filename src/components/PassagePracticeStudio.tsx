@@ -3,9 +3,8 @@
 import { useState, useEffect, useRef, useMemo, useTransition } from "react";
 import Link from "next/link";
 import { splitSentences, tokenizeWords, maskWord, calculateRecitationDiff, type WordToken } from "@/lib/passages";
-import { recordPassageSession } from "@/app/actions";
+import { recordPassageSession, deletePassageAndRedirect, resetPassageHistory } from "@/app/actions";
 import DeleteButton from "./DeleteButton";
-import { deletePassage } from "@/app/actions";
 
 // Sound effects with Web Audio API (zero external assets needed)
 function playSound(type: "correct" | "wrong" | "celebrate" | "tap") {
@@ -456,6 +455,14 @@ export default function PassagePracticeStudio({ passage }: PassageStudioProps) {
         </div>
 
         <div className="flex items-center gap-2 self-end sm:self-auto">
+          {passage.timesPracticed > 0 && (
+            <DeleteButton
+              onDelete={resetPassageHistory.bind(null, passage.id)}
+              confirmText={`Bạn có muốn xoá lịch sử luyện tập và điểm số của đoạn “${passage.title}”?`}
+              label="🔄 Đặt lại điểm"
+              className="btn-ghost !px-2.5 !py-1 text-xs text-muted hover:bg-petal-100"
+            />
+          )}
           <Link
             href={`/passages/${passage.id}/edit`}
             className="btn-soft !px-3.5 !py-1.5 text-xs"
@@ -464,8 +471,10 @@ export default function PassagePracticeStudio({ passage }: PassageStudioProps) {
             ✏️ Sửa
           </Link>
           <DeleteButton
-            onDelete={deletePassage.bind(null, passage.id)}
-            confirmText={`Xóa đoạn văn “${passage.title}”?`}
+            onDelete={deletePassageAndRedirect.bind(null, passage.id)}
+            confirmText={`Bạn có chắc muốn xoá vĩnh viễn đoạn văn “${passage.title}”?`}
+            label="🗑️ Xoá"
+            className="btn-ghost !px-3 !py-1.5 text-xs hover:!text-berry hover:bg-berry/10"
           />
         </div>
       </div>
