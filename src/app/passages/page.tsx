@@ -1,7 +1,7 @@
 import { connection } from "next/server";
 import Link from "next/link";
 import { prisma } from "@/lib/prisma";
-import { deletePassage, restoreDefaultPassages } from "@/app/actions";
+import { deletePassage, restoreDefaultPassages, ensureStarterPassages } from "@/app/actions";
 import SpeakButton from "@/components/SpeakButton";
 import DeleteButton from "@/components/DeleteButton";
 import type { Prisma } from "@/generated/prisma/client";
@@ -15,6 +15,13 @@ interface SearchParams {
 
 export default async function PassagesPage(props: { searchParams: Promise<SearchParams> }) {
   await connection();
+  const count = await prisma.passage.count();
+  if (count === 0) {
+    const sessions = await prisma.passageSession.count();
+    if (sessions === 0) {
+      await ensureStarterPassages();
+    }
+  }
 
   const sp = await props.searchParams;
   const q = sp.q?.trim();
