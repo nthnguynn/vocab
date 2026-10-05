@@ -8,7 +8,7 @@ Website học từ vựng tiếng Anh theo chủ đề — Next.js 16 + Prisma 7
 npm install            # tự chạy prisma generate
 npx prisma migrate dev # tạo database prisma/dev.db
 npm run db:seed        # nạp dữ liệu từ Google Sheet + chủ đề mẫu
-npm run dev            # http://localhost:3002
+npm run dev            # http://localhost:3001
 ```
 
 `npm run db:reset` xoá và nạp lại toàn bộ dữ liệu.
