@@ -12,7 +12,7 @@ export async function generateMetadata(props: { params: Promise<{ unitId: string
 
   return {
     title: `${unit.title} — Luyện Phản Xạ Vocab`,
-    description: `Luyện 30 câu phản xạ viết và nói chủ đề ${unit.engTitle} với audio bản xứ.`,
+    description: `Luyện ${unit.sentencesCount} câu phản xạ viết và nói chủ đề ${unit.engTitle} với audio bản xứ.`,
   };
 }
 
@@ -21,7 +21,7 @@ export default async function ReflexUnitPage(props: { params: Promise<{ unitId: 
   const { unitId } = await props.params;
   const num = Number(unitId);
 
-  if (isNaN(num) || num < 1 || num > 50) {
+  if (isNaN(num) || num < 1) {
     notFound();
   }
 
@@ -30,7 +30,7 @@ export default async function ReflexUnitPage(props: { params: Promise<{ unitId: 
     notFound();
   }
 
-  const categories = getAllCategories();
+  const categories = getAllCategories(unit.bookId ?? "1500");
   const category = categories.find((c) => c.id === unit.categoryId);
 
   // Load progress from SQLite

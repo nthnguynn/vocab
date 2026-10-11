@@ -1,4 +1,5 @@
-import datasetRaw from "@/data/reflex-dataset.json";
+import dataset1500Raw from "@/data/reflex-dataset.json";
+import dataset1000Raw from "@/data/reflex-1000-dataset.json";
 
 export interface ReflexSentence {
   order: number;
@@ -19,6 +20,8 @@ export interface ReflexExtraVocab {
 
 export interface ReflexUnit {
   unitNumber: number;
+  topicIndex?: number;
+  bookId?: "1500" | "1000";
   title: string;
   engTitle: string;
   viTitle: string | null;
@@ -36,23 +39,67 @@ export interface ReflexCategory {
   units: number[];
 }
 
-export interface ReflexDataset {
-  categories: ReflexCategory[];
-  units: ReflexUnit[];
+export interface ReflexBook {
+  id: "1500" | "1000";
+  title: string;
+  subtitle: string;
+  totalSentences: number;
+  totalUnits: number;
+  icon: string;
+  badge: string;
 }
 
-export const reflexDataset: ReflexDataset = datasetRaw as unknown as ReflexDataset;
+export const REFLEX_BOOKS: ReflexBook[] = [
+  {
+    id: "1500",
+    title: "1.500 Câu Phản Xạ Viết - Nói",
+    subtitle: "50 Unit giao tiếp cơ bản đến nâng cao (Có audio)",
+    totalSentences: 1500,
+    totalUnits: 50,
+    icon: "🌸",
+    badge: "50 Unit · Có Audio",
+  },
+  {
+    id: "1000",
+    title: "1.000 Câu Giao Tiếp Thực Tế",
+    subtitle: "40 Chủ đề đời sống, du lịch, đi làm & thi cử",
+    totalSentences: 1000,
+    totalUnits: 40,
+    icon: "📘",
+    badge: "40 Chủ đề · 4 Phần",
+  },
+];
 
-export function getAllCategories(): ReflexCategory[] {
-  return reflexDataset.categories;
+const data1500 = dataset1500Raw as unknown as { categories: ReflexCategory[]; units: ReflexUnit[] };
+const data1000 = dataset1000Raw as unknown as { categories: ReflexCategory[]; units: ReflexUnit[] };
+
+// Add bookId markers
+const units1500: ReflexUnit[] = data1500.units.map((u) => ({ ...u, bookId: "1500", topicIndex: u.unitNumber }));
+const units1000: ReflexUnit[] = data1000.units.map((u, idx) => ({ ...u, bookId: "1000", topicIndex: idx + 1 }));
+
+export function getBookById(id: "1500" | "1000"): ReflexBook {
+  return REFLEX_BOOKS.find((b) => b.id === id) || REFLEX_BOOKS[0];
 }
 
-export function getAllUnits(): ReflexUnit[] {
-  return reflexDataset.units;
+export function getAllCategories(bookId: "1500" | "1000" = "1500"): ReflexCategory[] {
+  return bookId === "1000" ? data1000.categories : data1500.categories;
+}
+
+export function getAllUnits(bookId?: "1500" | "1000"): ReflexUnit[] {
+  if (bookId === "1500") return units1500;
+  if (bookId === "1000") return units1000;
+  return [...units1500, ...units1000];
 }
 
 export function getReflexUnit(unitNumber: number): ReflexUnit | null {
-  return reflexDataset.units.find((u) => u.unitNumber === unitNumber) ?? null;
+  if (unitNumber > 100) {
+    return units1000.find((u) => u.unitNumber === unitNumber) ?? null;
+  }
+  return units1500.find((u) => u.unitNumber === unitNumber) ?? null;
+}
+
+export function getBookForUnit(unitNumber: number): ReflexBook {
+  return unitNumber > 100 ? REFLEX_BOOKS[1] : REFLEX_BOOKS[0];
 }
 
 /**
@@ -105,7 +152,6 @@ export function calculateSentenceDiff(
   const resultWords: DiffWord[] = [];
   let correctCount = 0;
 
-  // Thuật toán so khớp tuần tự từ
   let typIdx = 0;
   for (let i = 0; i < expTokens.length; i++) {
     const expClean = cleanExp[i];
@@ -120,12 +166,10 @@ export function calculateSentenceDiff(
         correctCount++;
         typIdx++;
       } else {
-        // Kiểm tra xem từ kế tiếp có khớp không
         const nextMatchInTyp = cleanTyp.indexOf(expClean, typIdx);
         const nextMatchInExp = cleanExp.indexOf(typClean, i);
 
         if (nextMatchInTyp !== -1 && nextMatchInTyp - typIdx <= 2) {
-          // Người dùng gõ thừa từ
           while (typIdx < nextMatchInTyp) {
             resultWords.push({ word: typTokens[typIdx], status: "extra", typed: typTokens[typIdx] });
             typIdx++;
@@ -134,10 +178,8 @@ export function calculateSentenceDiff(
           correctCount++;
           typIdx++;
         } else if (nextMatchInExp !== -1 && nextMatchInExp - i <= 2) {
-          // Người dùng bỏ sót từ
           resultWords.push({ word: expRaw, status: "missing", expected: expRaw });
         } else {
-          // Từ sai
           resultWords.push({ word: expRaw, status: "wrong", expected: expRaw, typed: typRaw });
           typIdx++;
         }
@@ -147,7 +189,6 @@ export function calculateSentenceDiff(
     }
   }
 
-  // Các từ thừa còn lại nếu có
   while (typIdx < typTokens.length) {
     resultWords.push({ word: typTokens[typIdx], status: "extra", typed: typTokens[typIdx] });
     typIdx++;
@@ -178,6 +219,6 @@ export function calculateSpeechAccuracy(expected: string, spoken: string): { acc
   const accuracy = Math.round((matched / normExpectedWords.length) * 100);
   return {
     accuracy,
-    isPass: accuracy >= 70, // 70% khớp từ là đạt yêu cầu phản xạ nói
+    isPass: accuracy >= 70,
   };
 }

@@ -11,7 +11,8 @@ export const metadata = {
 export default async function ReflexPage() {
   await connection();
 
-  const categories = getAllCategories();
+  const categories1500 = getAllCategories("1500");
+  const categories1000 = getAllCategories("1000");
   const units = getAllUnits();
 
   // Load progress from Prisma SQLite
@@ -66,7 +67,8 @@ export default async function ReflexPage() {
 
   return (
     <ReflexHubClient
-      categories={categories}
+      categories1500={categories1500}
+      categories1000={categories1000}
       units={units}
       progressMap={progressMap}
       totalPracticedSentences={totalPracticedSentences}

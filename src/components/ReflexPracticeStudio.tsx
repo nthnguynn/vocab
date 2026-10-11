@@ -710,7 +710,7 @@ export default function ReflexPracticeStudio({
           {categoryName || "Luyện phản xạ"}
         </span>
         <h2 className="h-display text-3xl font-bold text-slate-800">
-          Hoàn thành xuất sắc Unit {unit.unitNumber}!
+          Hoàn thành xuất sắc {unit.bookId === "1000" ? `Chủ đề ${unit.topicIndex ?? (unit.unitNumber - 100)}` : `Unit ${unit.unitNumber}`}!
         </h2>
         <p className="mt-2 text-slate-600">
           {unit.engTitle} {unit.viTitle && `(${unit.viTitle})`}
@@ -784,13 +784,15 @@ export default function ReflexPracticeStudio({
           >
             🔀 Luyện lại (Xáo câu)
           </button>
-          {!isCustomSet && unit.unitNumber < 50 && (
+          {!isCustomSet && ((unit.unitNumber >= 1 && unit.unitNumber < 50) || (unit.unitNumber >= 101 && unit.unitNumber < 140)) && (
             <Link href={`/reflex/${unit.unitNumber + 1}`} className="btn">
-              Tiếp tục Unit {unit.unitNumber + 1} ➔
+              {unit.bookId === "1000"
+                ? `Tiếp tục Chủ đề ${(unit.topicIndex ?? (unit.unitNumber - 100)) + 1} ➔`
+                : `Tiếp tục Unit ${unit.unitNumber + 1} ➔`}
             </Link>
           )}
           <Link href="/reflex" className="btn-soft">
-            📋 Danh sách 50 Unit
+            📋 Danh sách các Unit & Chủ đề
           </Link>
         </div>
       </div>
@@ -808,7 +810,12 @@ export default function ReflexPracticeStudio({
               ⚡ Phản xạ
             </Link>
             <span>›</span>
-            <span>{categoryName || `Unit ${unit.unitNumber}`}</span>
+            <span>
+              {categoryName ||
+                (unit.bookId === "1000"
+                  ? `Chủ đề ${unit.topicIndex ?? (unit.unitNumber - 100)}`
+                  : `Unit ${unit.unitNumber}`)}
+            </span>
           </div>
           <h1 className="h-display text-2xl font-bold text-slate-900 mt-1">
             {unit.title}
