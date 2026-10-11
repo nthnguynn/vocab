@@ -38,7 +38,7 @@ export default async function ReflexUnitPage(props: { params: Promise<{ unitId: 
     where: { unitNumber: num },
   });
 
-  const initialProgress = progressRows.map((r) => ({
+  const initialProgress = progressRows.map((r: { orderNumber: number; isBookmarked: boolean; timesPracticed: number; lastScore: number | null }) => ({
     orderNumber: r.orderNumber,
     isBookmarked: r.isBookmarked,
     timesPracticed: r.timesPracticed,
