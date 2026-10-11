@@ -139,7 +139,37 @@ export default function ReflexPracticeStudio({
     return map;
   });
 
-  const sentences = unit.sentences;
+  const [isShuffled, setIsShuffled] = useState(false);
+  const [practiceSentences, setPracticeSentences] = useState<ReflexSentence[]>(() => unit.sentences);
+
+  // Sync when unit changes
+  useEffect(() => {
+    setPracticeSentences(unit.sentences);
+    setIsShuffled(false);
+    setCurrentIndex(0);
+  }, [unit]);
+
+  const toggleShuffle = () => {
+    playSound("tap");
+    if (!isShuffled) {
+      const shuffled = [...unit.sentences].sort(() => Math.random() - 0.5);
+      setPracticeSentences(shuffled);
+      setIsShuffled(true);
+    } else {
+      setPracticeSentences(unit.sentences);
+      setIsShuffled(false);
+    }
+    setCurrentIndex(0);
+    setTypedInput("");
+    setWriteSubmitted(false);
+    setWriteDiff(null);
+    setIsFlipped(false);
+    setSpokenTranscript("");
+    setSpeakScore(null);
+    setSpeechError(null);
+  };
+
+  const sentences = practiceSentences;
   const currentSentence = sentences[currentIndex] || sentences[0];
   const isBookmarked = !!bookmarks[currentSentence?.order];
 
@@ -613,6 +643,8 @@ export default function ReflexPracticeStudio({
         <div className="mt-8 flex flex-wrap items-center justify-center gap-3">
           <button
             onClick={() => {
+              setPracticeSentences(unit.sentences);
+              setIsShuffled(false);
               setCurrentIndex(0);
               setResults([]);
               setIsCompleted(false);
@@ -621,7 +653,22 @@ export default function ReflexPracticeStudio({
             }}
             className="btn-soft"
           >
-            🔄 Luyện lại Unit này
+            🔄 Luyện lại (Thứ tự)
+          </button>
+          <button
+            onClick={() => {
+              const shuffled = [...unit.sentences].sort(() => Math.random() - 0.5);
+              setPracticeSentences(shuffled);
+              setIsShuffled(true);
+              setCurrentIndex(0);
+              setResults([]);
+              setIsCompleted(false);
+              setWriteSubmitted(false);
+              setTypedInput("");
+            }}
+            className="btn-soft text-petal-700 bg-petal-50 hover:bg-petal-100"
+          >
+            🔀 Luyện lại (Xáo câu)
           </button>
           {!isCustomSet && unit.unitNumber < 50 && (
             <Link href={`/reflex/${unit.unitNumber + 1}`} className="btn">
@@ -659,6 +706,20 @@ export default function ReflexPracticeStudio({
 
         {/* Action controls */}
         <div className="flex items-center gap-2">
+          {/* Shuffle Toggle Button */}
+          <button
+            onClick={toggleShuffle}
+            className={`flex items-center gap-1.5 rounded-full border px-3 py-1.5 text-xs font-semibold shadow-sm transition ${
+              isShuffled
+                ? "border-petal-500 bg-petal-500 text-white shadow-soft"
+                : "border-slate-200 bg-white text-slate-700 hover:border-petal-300 hover:bg-petal-50 hover:text-petal-700"
+            }`}
+            title={isShuffled ? "Đang xáo câu ngẫu nhiên (Bấm để quay về theo thứ tự)" : "Bấm để xáo trộn câu ngẫu nhiên"}
+          >
+            <span>🔀</span>
+            <span>{isShuffled ? "Đang xáo câu" : "Xáo câu"}</span>
+          </button>
+
           {/* Rate selector */}
           <select
             value={playbackRate}
