@@ -180,17 +180,33 @@ export default function ReflexPracticeStudio({
 
   // Sentence progress tracking state
   const [progressState, setProgressState] = useState<
-    Record<number, { timesPracticed: number; lastScore: number | null }>
+    Record<number, { timesPracticed: number; lastScore: number | null; isCorrect?: boolean }>
   >(() => {
-    const map: Record<number, { timesPracticed: number; lastScore: number | null }> = {};
+    const map: Record<number, { timesPracticed: number; lastScore: number | null; isCorrect?: boolean }> = {};
     initialProgress.forEach((p) => {
       map[p.orderNumber] = {
         timesPracticed: p.timesPracticed,
         lastScore: p.lastScore,
+        isCorrect: p.lastScore !== null ? p.lastScore >= 80 : undefined,
       };
     });
     return map;
   });
+
+  // Calculate wrong and correct sentences for re-practice
+  const wrongSentences = useMemo(() => {
+    return unit.sentences.filter((s) => {
+      const prog = progressState[s.order];
+      return prog && prog.timesPracticed > 0 && (prog.isCorrect === false || (prog.lastScore !== null && prog.lastScore < 80));
+    });
+  }, [unit.sentences, progressState]);
+
+  const correctSentences = useMemo(() => {
+    return unit.sentences.filter((s) => {
+      const prog = progressState[s.order];
+      return prog && prog.timesPracticed > 0 && (prog.isCorrect === true || (prog.lastScore !== null && prog.lastScore >= 80));
+    });
+  }, [unit.sentences, progressState]);
 
   // Auto-resume from unfinished sentence position on mount
   useEffect(() => {
@@ -230,6 +246,7 @@ export default function ReflexPracticeStudio({
       [orderNumber]: {
         timesPracticed: (prev[orderNumber]?.timesPracticed || 0) + 1,
         lastScore: score,
+        isCorrect,
       },
     }));
 
@@ -721,6 +738,23 @@ export default function ReflexPracticeStudio({
 
         {/* Navigation CTAs */}
         <div className="mt-8 flex flex-wrap items-center justify-center gap-3">
+          {wrongSentences.length > 0 && (
+            <button
+              onClick={() => {
+                setPracticeSentences(wrongSentences);
+                setIsShuffled(false);
+                setCurrentIndex(0);
+                setResults([]);
+                setIsCompleted(false);
+                setWriteSubmitted(false);
+                setTypedInput("");
+              }}
+              className="btn !bg-rose-600 hover:!bg-rose-700 !text-white flex items-center gap-1.5 shadow-md"
+            >
+              <span>🔴</span>
+              <span>Luyện lại {wrongSentences.length} câu sai</span>
+            </button>
+          )}
           <button
             onClick={() => {
               setPracticeSentences(unit.sentences);
@@ -901,16 +935,57 @@ export default function ReflexPracticeStudio({
       </div>
 
       {/* Quick Jump & Sentence Selector Strip */}
-      <div className="space-y-1">
-        <div className="flex items-center justify-between text-[11px] text-slate-400 px-1">
-          <span>Chọn câu nhanh:</span>
-          <span>Bấm số để nhảy tới câu bất kỳ</span>
+      <div className="space-y-1.5">
+        <div className="flex flex-wrap items-center justify-between text-xs text-slate-500 px-1 gap-2">
+          <div className="flex items-center gap-2">
+            <span className="font-semibold text-slate-700">Chọn câu:</span>
+            <span className="text-[11px] text-emerald-600 font-semibold">✓ {correctSentences.length} đúng</span>
+            {wrongSentences.length > 0 && (
+              <span className="text-[11px] text-rose-600 font-bold bg-rose-50 px-2 py-0.5 rounded-full border border-rose-200">
+                🔴 {wrongSentences.length} câu sai
+              </span>
+            )}
+          </div>
+
+          {wrongSentences.length > 0 && (
+            <button
+              onClick={() => {
+                playSound("tap");
+                if (practiceSentences.length === wrongSentences.length) {
+                  // Đang ở chế độ câu sai -> chuyển lại tất cả
+                  setPracticeSentences(unit.sentences);
+                } else {
+                  // Chuyển sang chỉ luyện câu sai
+                  setPracticeSentences(wrongSentences);
+                }
+                setCurrentIndex(0);
+                setTypedInput("");
+                setWriteSubmitted(false);
+                setWriteDiff(null);
+                setIsFlipped(false);
+                setSpokenTranscript("");
+                setSpeakScore(null);
+                setSpeechError(null);
+              }}
+              className={`rounded-full px-3 py-1 text-xs font-bold transition flex items-center gap-1.5 shadow-sm ${
+                practiceSentences.length === wrongSentences.length
+                  ? "bg-slate-800 text-white hover:bg-slate-700"
+                  : "bg-rose-500 text-white hover:bg-rose-600 shadow-soft"
+              }`}
+              title="Lọc riêng các câu sai để luyện đi luyện lại cho thuộc"
+            >
+              <span>{practiceSentences.length === wrongSentences.length ? "📋 Hiện tất cả câu" : "🎯 Luyện riêng các câu sai"}</span>
+            </button>
+          )}
         </div>
+
         <div className="flex items-center gap-1.5 overflow-x-auto py-1 px-0.5 [scrollbar-width:none]">
           {sentences.map((s, idx) => {
             const isCurrent = idx === currentIndex;
             const prog = progressState[s.order];
             const hasPracticed = (prog?.timesPracticed || 0) > 0;
+            const isWrong = hasPracticed && (prog.isCorrect === false || (prog.lastScore !== null && prog.lastScore < 80));
+            const isCorrect = hasPracticed && !isWrong;
             const isStarred = bookmarks[s.order];
 
             return (
@@ -930,14 +1005,21 @@ export default function ReflexPracticeStudio({
                 className={`relative flex size-8 shrink-0 items-center justify-center rounded-xl text-xs font-bold transition ${
                   isCurrent
                     ? "bg-petal-600 text-white shadow-soft ring-2 ring-petal-300 scale-105"
-                    : hasPracticed
+                    : isWrong
+                    ? "bg-rose-100 text-rose-700 border-2 border-rose-400 hover:bg-rose-200 shadow-sm"
+                    : isCorrect
                     ? "bg-emerald-50 text-emerald-700 border border-emerald-300 hover:bg-emerald-100"
                     : "bg-white text-slate-500 border border-slate-200 hover:border-petal-300 hover:text-petal-700"
                 }`}
-                title={`Câu #${s.order}${hasPracticed ? " (Đã luyện tập)" : " (Chưa hoàn thành)"}${isStarred ? " ⭐" : ""}`}
+                title={`Câu #${s.order}${isWrong ? " (🔴 Làm sai - cần luyện lại)" : isCorrect ? " (🟢 Đã làm đúng)" : " (Chưa làm)"}${isStarred ? " ⭐" : ""}`}
               >
                 {s.order}
-                {isStarred && (
+                {isWrong && (
+                  <span className="absolute -top-1 -right-1 flex size-2.5 items-center justify-center rounded-full bg-rose-500 text-[8px] text-white font-extrabold">
+                    ✕
+                  </span>
+                )}
+                {isStarred && !isWrong && (
                   <span className="absolute -top-1 -right-1 text-[9px]">⭐</span>
                 )}
               </button>
