@@ -328,3 +328,112 @@ export async function importFromFile(_: FormState, fd: FormData): Promise<FormSt
   if (!/\.(csv|tsv|txt)$/i.test(file.name)) return { error: "Chỉ nhận file .csv — trong Excel/Sheets chọn Tải xuống → CSV" };
   return importCsv(await file.text());
 }
+
+/* ---------------- Luyện phản xạ (Reflex) ---------------- */
+
+export interface SentenceResultPayload {
+  orderNumber: number;
+  score: number;
+  isCorrect: boolean;
+}
+
+export async function recordReflexSession(params: {
+  unitNumber: number;
+  mode: string;
+  score: number;
+  accuracy: number;
+  totalCount: number;
+  correctCount: number;
+  timeSeconds?: number;
+  sentenceResults?: SentenceResultPayload[];
+}) {
+  const session = await prisma.reflexSession.create({
+    data: {
+      unitNumber: params.unitNumber,
+      mode: params.mode,
+      score: params.score,
+      accuracy: params.accuracy,
+      totalCount: params.totalCount,
+      correctCount: params.correctCount,
+      timeSeconds: params.timeSeconds ?? null,
+    },
+  });
+
+  if (params.sentenceResults && params.sentenceResults.length > 0 && params.unitNumber > 0) {
+    for (const res of params.sentenceResults) {
+      await prisma.reflexSentenceProgress.upsert({
+        where: {
+          unitNumber_orderNumber: {
+            unitNumber: params.unitNumber,
+            orderNumber: res.orderNumber,
+          },
+        },
+        update: {
+          timesPracticed: { increment: 1 },
+          lastScore: res.score,
+          lastPracticedAt: new Date(),
+        },
+        create: {
+          unitNumber: params.unitNumber,
+          orderNumber: res.orderNumber,
+          timesPracticed: 1,
+          lastScore: res.score,
+          lastPracticedAt: new Date(),
+        },
+      });
+    }
+  }
+
+  revalidatePath("/reflex");
+  revalidatePath(`/reflex/${params.unitNumber}`);
+  revalidatePath("/");
+  return session;
+}
+
+export async function toggleBookmarkSentence(unitNumber: number, orderNumber: number) {
+  const existing = await prisma.reflexSentenceProgress.findUnique({
+    where: {
+      unitNumber_orderNumber: {
+        unitNumber,
+        orderNumber,
+      },
+    },
+  });
+
+  const nextBookmarked = !existing?.isBookmarked;
+
+  await prisma.reflexSentenceProgress.upsert({
+    where: {
+      unitNumber_orderNumber: {
+        unitNumber,
+        orderNumber,
+      },
+    },
+    update: {
+      isBookmarked: nextBookmarked,
+    },
+    create: {
+      unitNumber,
+      orderNumber,
+      isBookmarked: nextBookmarked,
+    },
+  });
+
+  revalidatePath("/reflex");
+  revalidatePath(`/reflex/${unitNumber}`);
+  return { isBookmarked: nextBookmarked };
+}
+
+export async function resetUnitReflexProgress(unitNumber: number) {
+  await prisma.reflexSentenceProgress.deleteMany({
+    where: { unitNumber },
+  });
+  await prisma.reflexSession.deleteMany({
+    where: { unitNumber },
+  });
+  revalidatePath("/reflex");
+  revalidatePath(`/reflex/${unitNumber}`);
+  revalidatePath("/");
+  return { ok: true };
+}
+

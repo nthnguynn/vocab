@@ -8,12 +8,15 @@ const WEEKDAYS = ["T2", "T3", "T4", "T5", "T6", "T7", "CN"];
 
 export default async function Home() {
   await connection();
-  const [d, recentPassages] = await Promise.all([
+  const [d, recentPassages, reflexPracticedCount] = await Promise.all([
     getDashboard(),
     prisma.passage.findMany({
       take: 3,
       orderBy: { createdAt: "desc" },
       include: { topic: { select: { name: true, emoji: true } } },
+    }),
+    prisma.reflexSentenceProgress.count({
+      where: { timesPracticed: { gt: 0 } },
     }),
   ]);
   const { goals } = d;
@@ -33,6 +36,7 @@ export default async function Home() {
           </div>
           <div className="flex flex-wrap gap-2">
             <Link href="/words" className="btn">＋ Thêm từ mới</Link>
+            <Link href="/reflex" className="btn-soft">⚡ Luyện phản xạ (1500 câu)</Link>
             <Link href="/passages" className="btn-soft">📜 Luyện đoạn văn</Link>
             <Link href="/review?mode=due" className="btn-soft">🔁 Ôn tập ({goals.review.due})</Link>
           </div>
@@ -154,6 +158,44 @@ export default async function Home() {
               </Link>
             );
           })}
+        </div>
+      </section>
+
+      {/* Reflex Practice Spotlight */}
+      <section className="card bg-gradient-to-br from-petal-50/70 via-white to-white border-petal-200 !p-6 sm:!p-7">
+        <div className="flex flex-col gap-4 sm:flex-row sm:items-center sm:justify-between">
+          <div className="flex items-start gap-3.5">
+            <span className="flex size-12 shrink-0 items-center justify-center rounded-2xl bg-petal-500 text-2xl text-white shadow-soft">
+              ⚡
+            </span>
+            <div>
+              <div className="flex items-center gap-2">
+                <h2 className="h-display text-lg sm:text-xl font-bold text-slate-900">
+                  Luyện Phản Xạ Viết & Nói
+                </h2>
+                <span className="chip text-[11px] bg-petal-100 text-petal-700 font-bold">
+                  1.500 Câu
+                </span>
+              </div>
+              <p className="mt-1 text-xs text-slate-600 max-w-xl leading-relaxed">
+                Rèn luyện khả năng bật ra tiếng Anh tự nhiên trong 3-5 giây với 50 Unit theo chủ đề giao tiếp, công việc và đời sống (kèm Audio bản xứ en-US).
+              </p>
+              <div className="mt-2 flex items-center gap-3 text-xs text-slate-500 font-medium">
+                <span>Đã luyện: <b className="text-petal-600">{reflexPracticedCount}</b>/1500 câu</span>
+                <span>·</span>
+                <span>4 chế độ: Viết ✍️ | Nói 🎙️ | Thẻ 🗂️ | Ghép 🧩</span>
+              </div>
+            </div>
+          </div>
+
+          <div className="flex flex-wrap items-center gap-2 sm:shrink-0">
+            <Link href="/reflex/mixed" className="btn-soft !py-2 !px-4 text-xs font-semibold">
+              🎲 Thử thách 30 câu
+            </Link>
+            <Link href="/reflex" className="btn !py-2 !px-5 text-xs font-semibold">
+              Khám phá 50 Unit ➔
+            </Link>
+          </div>
         </div>
       </section>
 

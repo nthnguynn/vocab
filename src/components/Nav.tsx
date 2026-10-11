@@ -9,6 +9,7 @@ const LINKS = [
   { href: "/topics", label: "Chủ đề", icon: "🌷" },
   { href: "/words", label: "Từ vựng", icon: "📒" },
   { href: "/passages", label: "Đoạn văn", icon: "📜" },
+  { href: "/reflex", label: "Phản xạ", icon: "⚡" },
   { href: "/review", label: "Ôn tập", icon: "🔁" },
   { href: "/test", label: "Kiểm tra", icon: "✍️" },
   { href: "/import", label: "Nhập Sheet", icon: "📥" },

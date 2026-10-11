@@ -87,3 +87,33 @@ model PassageSession {
   @@index([createdAt])
 }
 
+model ReflexSentenceProgress {
+  id              Int       @id @default(autoincrement())
+  unitNumber      Int       // 1 to 50
+  orderNumber     Int       // 1 to 30
+  isBookmarked    Boolean   @default(false)
+  timesPracticed  Int       @default(0)
+  lastScore       Int?      // 0 - 100
+  lastPracticedAt DateTime?
+  updatedAt       DateTime  @updatedAt
+
+  @@unique([unitNumber, orderNumber])
+  @@index([unitNumber])
+  @@index([isBookmarked])
+}
+
+model ReflexSession {
+  id           Int      @id @default(autoincrement())
+  unitNumber   Int      // 1 to 50, hoặc 0 cho custom/mixed
+  mode         String   // "write" | "speak" | "flashcard" | "scramble"
+  score        Int      // 0 - 100
+  accuracy     Float?
+  totalCount   Int
+  correctCount Int
+  timeSeconds  Int?
+  createdAt    DateTime @default(now())
+
+  @@index([unitNumber])
+  @@index([createdAt])
+}
+
