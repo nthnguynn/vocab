@@ -201,7 +201,10 @@ export default function ReflexPracticeStudio({
   // Focus input on mode write
   useEffect(() => {
     if (mode === "write" && !writeSubmitted) {
-      inputRef.current?.focus();
+      const timer = setTimeout(() => {
+        inputRef.current?.focus();
+      }, 30);
+      return () => clearTimeout(timer);
     }
   }, [currentIndex, mode, writeSubmitted]);
 
@@ -300,16 +303,29 @@ export default function ReflexPracticeStudio({
   // Keyboard shortcut support
   useEffect(() => {
     const handleKeyDown = (e: KeyboardEvent) => {
-      // Don't intercept if user is typing in input
-      if (mode === "write" && document.activeElement === inputRef.current) {
-        if (e.key === "Enter") {
-          e.preventDefault();
+      // Khi nhấn phím Enter
+      if (e.key === "Enter") {
+        e.preventDefault();
+        if (mode === "write") {
           if (!writeSubmitted) {
             handleCheckWrite();
           } else {
             handleNextSentence();
           }
+        } else if (mode === "scramble") {
+          if (!scrambleSubmitted && selectedTokens.length > 0) {
+            handleCheckScramble();
+          } else if (scrambleSubmitted) {
+            handleNextSentence();
+          }
+        } else {
+          handleNextSentence();
         }
+        return;
+      }
+
+      // Khi người dùng đang gõ trong input text thì không nhận phím Space/Mũi tên làm shortcut
+      if (mode === "write" && document.activeElement === inputRef.current) {
         return;
       }
 
@@ -327,7 +343,16 @@ export default function ReflexPracticeStudio({
 
     window.addEventListener("keydown", handleKeyDown);
     return () => window.removeEventListener("keydown", handleKeyDown);
-  }, [mode, writeSubmitted, currentSentence, currentIndex, typedInput, playbackRate]);
+  }, [
+    mode,
+    writeSubmitted,
+    currentSentence,
+    currentIndex,
+    typedInput,
+    playbackRate,
+    scrambleSubmitted,
+    selectedTokens,
+  ]);
 
   /* ---------------- Actions ---------------- */
 
@@ -931,7 +956,10 @@ export default function ReflexPracticeStudio({
                   </div>
                 </div>
 
-                <div className="flex justify-end gap-2">
+                <div className="flex items-center justify-between gap-2 pt-1">
+                  <span className="text-xs text-slate-500 font-medium">
+                    Nhấn <kbd className="rounded bg-slate-200 px-1.5 py-0.5 text-[11px] font-mono font-bold text-slate-700">Enter</kbd> để tiếp tục
+                  </span>
                   <button onClick={handleNextSentence} className="btn !py-2.5 !px-6 text-sm">
                     Câu tiếp theo ➔
                   </button>
