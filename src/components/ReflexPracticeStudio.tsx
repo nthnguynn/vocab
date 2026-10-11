@@ -10,7 +10,12 @@ import {
   normalizeSentence,
   type DiffWord,
 } from "@/lib/reflex";
-import { recordReflexSession, toggleBookmarkSentence, resetUnitReflexProgress } from "@/app/actions";
+import {
+  recordReflexSession,
+  toggleBookmarkSentence,
+  resetUnitReflexProgress,
+  saveSentenceReflexProgress,
+} from "@/app/actions";
 
 // Sound effects with Web Audio API
 function playSound(type: "correct" | "wrong" | "celebrate" | "tap" | "tick") {
@@ -173,6 +178,72 @@ export default function ReflexPracticeStudio({
   const currentSentence = sentences[currentIndex] || sentences[0];
   const isBookmarked = !!bookmarks[currentSentence?.order];
 
+  // Sentence progress tracking state
+  const [progressState, setProgressState] = useState<
+    Record<number, { timesPracticed: number; lastScore: number | null }>
+  >(() => {
+    const map: Record<number, { timesPracticed: number; lastScore: number | null }> = {};
+    initialProgress.forEach((p) => {
+      map[p.orderNumber] = {
+        timesPracticed: p.timesPracticed,
+        lastScore: p.lastScore,
+      };
+    });
+    return map;
+  });
+
+  // Auto-resume from unfinished sentence position on mount
+  useEffect(() => {
+    if (typeof window === "undefined" || isCustomSet || unit.unitNumber <= 0) return;
+    try {
+      const saved = localStorage.getItem(`reflex_last_pos_${unit.unitNumber}`);
+      if (saved !== null) {
+        const savedIdx = parseInt(saved, 10);
+        if (!isNaN(savedIdx) && savedIdx >= 0 && savedIdx < unit.sentences.length) {
+          setCurrentIndex(savedIdx);
+          return;
+        }
+      }
+      // If no saved position, jump to first unpracticed sentence
+      const firstUnfinished = unit.sentences.findIndex(
+        (s) => (progressState[s.order]?.timesPracticed || 0) === 0
+      );
+      if (firstUnfinished > 0 && firstUnfinished < unit.sentences.length) {
+        setCurrentIndex(firstUnfinished);
+      }
+    } catch {}
+  }, [unit.unitNumber]);
+
+  // Save current position to localStorage
+  useEffect(() => {
+    if (!isCustomSet && unit.unitNumber > 0) {
+      try {
+        localStorage.setItem(`reflex_last_pos_${unit.unitNumber}`, String(currentIndex));
+      } catch {}
+    }
+  }, [currentIndex, unit.unitNumber, isCustomSet]);
+
+  // Helper to persist single sentence result in real-time
+  const saveSingleSentenceProgress = (orderNumber: number, score: number, isCorrect: boolean) => {
+    setProgressState((prev) => ({
+      ...prev,
+      [orderNumber]: {
+        timesPracticed: (prev[orderNumber]?.timesPracticed || 0) + 1,
+        lastScore: score,
+      },
+    }));
+
+    if (!isCustomSet && unit.unitNumber > 0) {
+      startTransition(async () => {
+        await saveSentenceReflexProgress({
+          unitNumber: unit.unitNumber,
+          orderNumber,
+          score,
+        });
+      });
+    }
+  };
+
   // Results tracker for session summary
   const [results, setResults] = useState<
     {
@@ -267,6 +338,7 @@ export default function ReflexPracticeStudio({
             } else {
               playSound("wrong");
             }
+            saveSingleSentenceProgress(currentSentence.order, evalResult.accuracy, evalResult.isPass);
           }
         };
 
@@ -486,6 +558,9 @@ export default function ReflexPracticeStudio({
         userAnswer: typedInput,
       },
     ]);
+
+    // Save sentence progress immediately to SQLite database
+    saveSingleSentenceProgress(currentSentence.order, diff.accuracy, diff.isCorrect);
   };
 
   /* ----- Mode 2 Speak Logic ----- */
@@ -548,6 +623,8 @@ export default function ReflexPracticeStudio({
         isCorrect: isPass,
       },
     ]);
+
+    saveSingleSentenceProgress(currentSentence.order, accuracy, isPass);
   };
 
   /* ----- Mode 4 Scramble Logic ----- */
@@ -576,15 +653,18 @@ export default function ReflexPracticeStudio({
     }
     speakSentence(currentSentence.en, playbackRate);
 
+    const score = isCorrect ? 100 : 0;
     setResults((prev) => [
       ...prev.filter((r) => r.orderNumber !== currentSentence.order),
       {
         orderNumber: currentSentence.order,
-        score: isCorrect ? 100 : 0,
+        score,
         isCorrect,
         userAnswer: assembled,
       },
     ]);
+
+    saveSingleSentenceProgress(currentSentence.order, score, isCorrect);
   };
 
   // Reset progress action
@@ -817,6 +897,52 @@ export default function ReflexPracticeStudio({
             className="h-full rounded-full bg-gradient-to-r from-petal-400 to-petal-600 transition-all duration-300"
             style={{ width: `${((currentIndex + 1) / sentences.length) * 100}%` }}
           />
+        </div>
+      </div>
+
+      {/* Quick Jump & Sentence Selector Strip */}
+      <div className="space-y-1">
+        <div className="flex items-center justify-between text-[11px] text-slate-400 px-1">
+          <span>Chọn câu nhanh:</span>
+          <span>Bấm số để nhảy tới câu bất kỳ</span>
+        </div>
+        <div className="flex items-center gap-1.5 overflow-x-auto py-1 px-0.5 [scrollbar-width:none]">
+          {sentences.map((s, idx) => {
+            const isCurrent = idx === currentIndex;
+            const prog = progressState[s.order];
+            const hasPracticed = (prog?.timesPracticed || 0) > 0;
+            const isStarred = bookmarks[s.order];
+
+            return (
+              <button
+                key={s.order}
+                onClick={() => {
+                  playSound("tap");
+                  setCurrentIndex(idx);
+                  setTypedInput("");
+                  setWriteSubmitted(false);
+                  setWriteDiff(null);
+                  setIsFlipped(false);
+                  setSpokenTranscript("");
+                  setSpeakScore(null);
+                  setSpeechError(null);
+                }}
+                className={`relative flex size-8 shrink-0 items-center justify-center rounded-xl text-xs font-bold transition ${
+                  isCurrent
+                    ? "bg-petal-600 text-white shadow-soft ring-2 ring-petal-300 scale-105"
+                    : hasPracticed
+                    ? "bg-emerald-50 text-emerald-700 border border-emerald-300 hover:bg-emerald-100"
+                    : "bg-white text-slate-500 border border-slate-200 hover:border-petal-300 hover:text-petal-700"
+                }`}
+                title={`Câu #${s.order}${hasPracticed ? " (Đã luyện tập)" : " (Chưa hoàn thành)"}${isStarred ? " ⭐" : ""}`}
+              >
+                {s.order}
+                {isStarred && (
+                  <span className="absolute -top-1 -right-1 text-[9px]">⭐</span>
+                )}
+              </button>
+            );
+          })}
         </div>
       </div>
 

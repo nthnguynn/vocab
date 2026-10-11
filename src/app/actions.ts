@@ -390,6 +390,35 @@ export async function recordReflexSession(params: {
   return session;
 }
 
+export async function saveSentenceReflexProgress(params: {
+  unitNumber: number;
+  orderNumber: number;
+  score: number;
+}) {
+  if (params.unitNumber <= 0) return;
+  await prisma.reflexSentenceProgress.upsert({
+    where: {
+      unitNumber_orderNumber: {
+        unitNumber: params.unitNumber,
+        orderNumber: params.orderNumber,
+      },
+    },
+    update: {
+      timesPracticed: { increment: 1 },
+      lastScore: params.score,
+      lastPracticedAt: new Date(),
+    },
+    create: {
+      unitNumber: params.unitNumber,
+      orderNumber: params.orderNumber,
+      timesPracticed: 1,
+      lastScore: params.score,
+      lastPracticedAt: new Date(),
+    },
+  });
+}
+
+
 export async function toggleBookmarkSentence(unitNumber: number, orderNumber: number) {
   const existing = await prisma.reflexSentenceProgress.findUnique({
     where: {
